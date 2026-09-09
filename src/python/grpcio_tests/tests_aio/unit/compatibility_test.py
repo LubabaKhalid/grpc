@@ -271,6 +271,21 @@ class TestCompatibility(AioTestBase):
             grpc.StatusCode.INTERNAL, exception_context.exception.code()
         )
 
+    async def test_sync_unary_unary_abort_stops_execution(self):
+        seen = []
+
+        @grpc.unary_unary_rpc_method_handler
+        def abort_unary_unary(request: bytes, context: grpc.ServicerContext):
+            context.abort(grpc.StatusCode.INTERNAL, "Test")
+            seen.append("after_abort")
+
+        self._adhoc_handlers.set_adhoc_handler(abort_unary_unary)
+        with self.assertRaises(aio.AioRpcError):
+            await self._async_channel.unary_unary(_common.ADHOC_METHOD)(
+                _REQUEST
+            )
+        self.assertEqual([], seen)
+
     async def test_sync_unary_unary_set_code(self):
         @grpc.unary_unary_rpc_method_handler
         def set_code_unary_unary(request: bytes, context: grpc.ServicerContext):
